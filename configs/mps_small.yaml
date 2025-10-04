@@ -1,0 +1,55 @@
+# MPS Configuration for Apple Silicon
+# Optimized for M1/M2 Macs with Metal Performance Shaders
+
+# Device configuration
+device:
+  prefer_mps: true
+  dtype: float16  # MPS supports float16 efficiently
+  fallback_to_cpu: true
+
+# Model configuration
+model:
+  name: "EleutherAI/pythia-410m-deduped"
+  num_labels: 4
+  max_length: 256  # Conservative for MPS memory
+  
+# LoRA configuration
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.05
+  target_modules: ["q_proj", "k_proj", "v_proj", "dense", "fc", "proj"]
+
+# Training configuration
+training:
+  output_dir: "outputs/mps_experiment"
+  epochs: 2
+  batch_size: 1  # Small batch size for MPS
+  gradient_accumulation_steps: 16  # Effective batch size = 16
+  learning_rate: 0.0002
+  weight_decay: 0.01
+  warmup_steps: 100
+  logging_steps: 10
+  eval_steps: 100
+  save_steps: 500
+  gradient_checkpointing: false  # Not needed for small model
+  use_class_weights: true
+
+# Data configuration
+data:
+  source: "synthetic"  # synthetic or ag_news
+  synthetic_path: "data/synthetic_tickets.jsonl"
+  limit: 2000
+  test_size: 0.1
+  val_size: 0.1
+  date_column: null  # Use random split
+
+# Preprocessing configuration
+preprocessing:
+  lowercase: false
+  strip_html: true
+  redact_pii: true
+
+# Logging configuration
+log_level: "INFO"
+seed: 42
