@@ -3,10 +3,10 @@ Evaluation pipeline for ticket routing models.
 
 Features:
 - Comprehensive metrics computation (accuracy, F1, precision, recall)
-- Professional confusion matrix visualization
+- Confusion matrix visualization
 - Detailed classification reports with per-class analysis
 - Top-k accuracy evaluation for production deployment
-- Professional logging and result persistence
+- Logging and result persistence
 """
 
 import json

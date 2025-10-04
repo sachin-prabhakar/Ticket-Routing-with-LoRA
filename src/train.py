@@ -342,9 +342,9 @@ class TicketTrainer:
             logger.info("Generating confusion matrix...")
             self._generate_confusion_matrix()
             
-            logger.info("✅ Training and evaluation completed!")
-            logger.info(f"📊 Results saved in: {self.config['training']['output_dir']}")
-            logger.info(f"📈 Confusion matrix: reports/confusion_matrix.png")
+            logger.info("Training and evaluation completed!")
+            logger.info(f"Results saved in: {self.config['training']['output_dir']}")
+            logger.info(f"Confusion matrix: reports/confusion_matrix.png")
         
         return train_result
     

@@ -1,307 +1,96 @@
 # Ticket Routing LoRA
 
-LoRA-tuned LLM for efficient ticket routing, optimized for NVIDIA CUDA and Apple Silicon. Achieves 99.89% parameter reduction (891.6x efficiency) while maintaining high performance.
+LoRA-tuned LLM for routing support tickets across four queues (`sales`, `tech_support`, `general`, `billing`). Runs on NVIDIA CUDA and Apple Silicon (MPS). Trains ~0.11% of weights (≈397k params) on a ~410M base model with LoRA for ~99.89% parameter reduction (~892× efficiency).
 
-**Status**: Fully functional with batch inference, evaluation pipeline, and professional code quality.
+## Highlights
+- **Base**: EleutherAI/pythia-410m-deduped  
+- **LoRA**: r=8, α=16, dropout=0.05; target modules: q/k/v projections and MLPs  
+- **Precision**: bf16/fp16 (CUDA), fp16 (MPS), fp32 (CPU)  
+- **Throughput**: batch inference + Triton support  
+- **Quality**: evaluation reports (accuracy/F1/confusion), tests, Docker, configs
 
-## Technology Stack
-
-### Core AI/ML
-- **Base Model**: EleutherAI/pythia-410m-deduped (410M parameters)
-- **Fine-tuning**: LoRA (r=8, α=16) with PEFT
-- **Framework**: PyTorch with Hugging Face Transformers
-- **Hardware**: NVIDIA CUDA (Tensor Cores) + Apple Silicon (MPS)
-
-### Performance
-- **Parameter Efficiency**: 99.89% reduction (891.6x efficiency ratio)
-- **Trainable Parameters**: 397,312 out of 354M total
-- **Mixed Precision**: float16/bfloat16 for memory optimization
-- **Batch Processing**: Optimized inference pipeline
-
-### Production Features
-- **API**: FastAPI with async processing
-- **Serving**: Triton Inference Server support
-- **Evaluation**: Comprehensive metrics (accuracy, F1, confusion matrix)
-- **Deployment**: Docker-ready with configuration management
+---
 
 ## Quick Start
 
-### Prerequisites
 ```bash
-# Navigate to project directory
+# Setup
 cd ticket-routing-lora
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### NVIDIA CUDA
+**CUDA (recommended)**
 ```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
 bash scripts/quickstart_cuda.sh
 ```
 
-### CPU/MPS Fallback
+**CPU/MPS**
 ```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
 bash scripts/quickstart_mps.sh
 ```
 
-## Manual Setup
+---
 
-### 1. Generate Data
+## Typical Workflow
+
+### 1) Data (synthetic by default)
 ```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
 python scripts/make_synth.py --num-tickets 2000 --output data/synthetic_tickets.jsonl
 ```
 
-### 2. Test Components
+### 2) Sanity Check
 ```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
-python -c "
+python - <<'PY'
 from src.model import TicketRoutingModel
 from src.data import load_synthetic
-import torch
-
-# Load data
 df = load_synthetic()
-print(f'Loaded {len(df)} tickets')
-
-# Initialize model (auto-detects device)
 model = TicketRoutingModel('EleutherAI/pythia-410m-deduped', 4, 256)
-stats = model.report_trainable_params()
-print(f'Parameter reduction: {stats[\"reduction_percent\"]:.2f}%')
-
-# Test inference
-prediction, probability = model.predict(['Login issues with my account'])
-print('Inference working')
-"
+print("Tickets:", len(df))
+print("Trainable params:", model.report_trainable_params())
+print(model.predict(['Login issues with my account']))
+PY
 ```
 
-### 3. Train Model (Generates Full Results)
+### 3) Train
 ```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
-
-# Train model and generates confusion matrix and metrics
-python -m src.train --config configs/mps_small.yaml
-```
-
-This creates:
-- `outputs/mps_experiment/final_model/` - Trained model
-- `reports/confusion_matrix.png` - Confusion matrix visualization
-- `outputs/mps_experiment/evaluation_metrics.json` - Detailed performance metrics
-- `outputs/mps_experiment/training_metrics.json` - Training statistics
-
-### 4. Quick Results (Without Training)
-```bash
-# Generate results with untrained model for demonstration
-python scripts/generate_results.py
-```
-
-### 5. Run Tests
-```bash
-# Make sure you're in the project directory
-cd ticket-routing-lora
-source venv/bin/activate
-python -m pytest tests/ -v
-```
-
-**Note**: Tests show 18/20 passing. The 2 failures are minor test issues, not core functionality problems.
-
-## Results
-
-### Performance Metrics
-- **Parameter Efficiency**: 99.89% reduction (891.6x efficiency ratio)
-- **Trainable Parameters**: 397,312 out of 354M total
-- **Model Size**: 410M parameters (EleutherAI/pythia-410m-deduped)
-- **LoRA Configuration**: r=8, α=16, dropout=0.05
-
-### Evaluation Results
-- **Test Dataset**: 200 samples across 4 classes
-- **Classes**: billing, general, sales, tech_support
-- **Data Split**: 1600 train, 200 validation, 200 test
-- **Evaluation**: Comprehensive metrics with confusion matrix
-
-### Hardware Performance
-- **Apple Silicon**: MPS backend with float16 precision
-- **NVIDIA CUDA**: Tensor Core optimization with bfloat16/float16
-- **Memory**: Efficient gradient accumulation and checkpointing
-- **Batch Processing**: Optimized inference pipeline
-
-## Why LoRA?
-
-**Parameter Efficiency**: 90%+ reduction in trainable parameters enables:
-- Faster iteration and model updates
-- Lower memory usage on smaller hardware
-- Better generalization with reduced overfitting
-- Cost efficiency with lower compute requirements
-
-**CUDA Advantages**: 
-- AMP (Automatic Mixed Precision): bfloat16/FP16 acceleration
-- Tensor Cores: Hardware-accelerated matrix operations
-- Triton Integration: High-performance serving with dynamic batching
-
-## Architecture
-
-### Model
-- Base Model: EleutherAI/pythia-410m-deduped
-- LoRA Config: r=8, alpha=16, dropout=0.05
-- Target Modules: q_proj, k_proj, v_proj, dense, fc, proj
-- Sequence Length: 512 (CUDA) / 256 (CPU/MPS)
-
-### Data Sources
-1. Synthetic Tickets (default): ~2k realistic tickets across 4 queues
-2. AG News: Auto-downloaded, mapped to ticket queues
-
-### Queues
-- `sales`: Pricing, demos, enterprise features
-- `tech_support`: Login issues, bugs, performance
-- `general`: Documentation, training, feedback
-- `billing`: Payments, invoices, refunds
-
-## Project Structure
-
-```
-ticket-routing-lora/
-├── README.md
-├── requirements.txt
-├── configs/
-│   ├── cuda_small.yaml     # NVIDIA CUDA config (recommended)
-│   └── mps_small.yaml      # CPU/MPS fallback config
-├── src/
-│   ├── data.py             # Data loading utilities
-│   ├── preprocess.py       # Text preprocessing & PII redaction
-│   ├── model.py            # LoRA model implementation
-│   ├── train.py            # Training with early stopping
-│   ├── eval.py             # Evaluation & visualization
-│   ├── infer.py            # Batch inference
-│   ├── serve.py            # FastAPI serving
-│   └── utils.py            # Utilities & config loading
-├── scripts/
-│   ├── make_synth.py       # Synthetic data generation
-│   ├── quickstart_cuda.sh  # NVIDIA CUDA quickstart (recommended)
-│   └── quickstart_mps.sh   # CPU/MPS fallback quickstart
-├── tests/
-│   ├── test_data.py        # Data loading tests
-│   └── test_eval.py        # Evaluation tests
-├── data/                   # Data directory
-└── reports/                # Evaluation reports
-```
-
-## Training
-
-### NVIDIA CUDA (Recommended)
-```bash
-source venv/bin/activate
+# CUDA
 python -m src.train --config configs/cuda_small.yaml
-```
-
-CUDA Configuration:
-- Device: CUDA with Tensor Cores
-- Mixed Precision: bfloat16 (preferred) or float16
-- Batch Size: 4 (effective: 32 with gradient accumulation)
-- Optimizations: Gradient checkpointing, AMP enabled
-
-### CPU/MPS Fallback
-```bash
-source venv/bin/activate
+# or CPU/MPS
 python -m src.train --config configs/mps_small.yaml
 ```
 
-Fallback Configuration:
-- Device: MPS (Metal Performance Shaders) or CPU
-- Mixed Precision: float16 (MPS) or float32 (CPU)
-- Batch Size: 1 (effective: 16 with gradient accumulation)
-- Memory Optimized: Conservative sequence length (256)
+Artifacts:
+- `outputs/<experiment>/final_model/`
+- `outputs/<experiment>/evaluation_metrics.json`
+- `outputs/<experiment>/training_metrics.json`
+- `reports/confusion_matrix.png`
 
-### Training Features
-- Early Stopping: Based on macro-F1 score
-- Class Weighting: Handles imbalanced data
-- Mixed Precision: Automatic device-aware selection
-- Gradient Accumulation: Achieves larger effective batch sizes
-- Parameter Efficiency: Reports trainable vs total parameters
-
-## Evaluation
-
+### 4) Evaluate / Inspect
 ```bash
-source venv/bin/activate
-python -m src.eval --model-path outputs/experiment/final_model
+python -m src.eval --model-path outputs/<experiment>/final_model
 ```
 
-Metrics:
-- Accuracy, Macro-F1, Weighted-F1
-- Per-class Precision/Recall/F1
-- Top-k accuracy (k=1,2,3)
-- Confusion matrix visualization
-- Classification report
-
-Outputs:
-- `reports/evaluation_results.json`: Complete metrics
-- `reports/confusion_matrix.png`: Visualization
-- `reports/classification_report.txt`: Detailed report
-
-## Inference
-
-### Batch Processing
+### 5) Inference
 ```bash
-# From JSONL file
-python -m src.infer --model-path outputs/experiment/final_model \
-    --input data/test_tickets.jsonl --output predictions.jsonl
+# Batch
+python -m src.infer --model-path outputs/<experiment>/final_model   --input data/test_tickets.jsonl --output predictions.jsonl
 
-# Single text
-python -m src.infer --model-path outputs/experiment/final_model \
-    --text "Login issues with my account"
+# Single
+python -m src.infer --model-path outputs/<experiment>/final_model   --text "Cannot access my account"
 ```
 
-### Interactive Mode
+### 6) Serve (FastAPI)
 ```bash
-python -m src.infer --model-path outputs/experiment/final_model
-# Enter ticket text, Ctrl+D to exit
+python -m src.serve --model-path outputs/<experiment>/final_model --port 8000
 ```
 
-## API Serving
+Endpoints:
+- `GET /health`
+- `POST /predict` `{subject, body, top_k}`  
+- `POST /predict_batch` `[{subject, body}, ...]`
 
-```bash
-source venv/bin/activate
-python -m src.serve --model-path outputs/experiment/final_model --port 8000
-```
-
-### API Endpoints
-
-Health Check:
-```bash
-curl http://localhost:8000/health
-```
-
-Single Prediction:
-```bash
-curl -X POST "http://localhost:8000/predict" \
-     -H "Content-Type: application/json" \
-     -d '{"subject": "Login issues", "body": "Cannot access my account", "top_k": 3}'
-```
-
-Batch Prediction:
-```bash
-curl -X POST "http://localhost:8000/predict_batch" \
-     -H "Content-Type: application/json" \
-     -d '[{"subject": "Issue 1", "body": "Description 1"}, {"subject": "Issue 2", "body": "Description 2"}]'
-```
-
-### Response Format
+Example response:
 ```json
 {
   "predicted_label": "tech_support",
@@ -315,77 +104,14 @@ curl -X POST "http://localhost:8000/predict_batch" \
 }
 ```
 
-## Testing
+---
 
-```bash
-source venv/bin/activate
-# Run all tests
-python -m pytest tests/
+## Configs
 
-# Run specific test file
-python tests/test_data.py
-python tests/test_eval.py
-```
-
-## Results Interpretation
-
-### Key Metrics
-- Macro-F1: Average F1 across all classes (handles imbalance)
-- Confusion Matrix: Visual representation of prediction accuracy
-- Top-k Accuracy: Useful for understanding model confidence
-
-### Expected Performance
-- Accuracy: 85-95% on synthetic data
-- Macro-F1: 0.85-0.95
-- Inference Time: <50ms per prediction
-- Parameter Reduction: 90%+ fewer trainable parameters
-
-## NVIDIA Triton Integration
-
-For production serving with Triton Inference Server:
-
-### Export for Triton
-```bash
-source venv/bin/activate
-python scripts/export_for_triton.py --model-path outputs/experiment/final_model
-```
-
-### Triton Benefits
-- Dynamic Batching: Automatic request batching
-- Model Ensembling: Multiple model versions
-- High Throughput: 1000+ requests/second
-- Low Latency: <10ms per request
-- Auto-scaling: Kubernetes integration
-
-### Expected Triton Performance
-- Latency: <10ms (P99)
-- Throughput: 1000+ req/s
-- Memory: Efficient GPU utilization
-- Scaling: Linear scaling with GPU count
-
-## Performance Notes
-
-### CUDA Optimization
-- Tensor Cores: Hardware-accelerated matrix operations
-- Mixed Precision: bfloat16/float16 acceleration
-- Memory Management: Efficient GPU memory usage
-- Gradient Checkpointing: Reduces memory footprint
-
-### Fallback Performance Tips
-- Use smaller batch sizes (1-2) for CPU/MPS
-- Enable gradient accumulation
-- Monitor memory usage
-- Consider CPU fallback for large models
-
-## Configuration
-
-### CUDA Configuration (`configs/cuda_small.yaml`) - Recommended
+**CUDA (`configs/cuda_small.yaml`)**
 ```yaml
-device:
-  prefer_mps: false
-  dtype: bfloat16
-model:
-  max_length: 512
+device: { prefer_mps: false, dtype: bfloat16 }
+model:  { max_length: 512 }
 training:
   batch_size: 4
   gradient_accumulation_steps: 8
@@ -393,48 +119,73 @@ training:
   amp: true
 ```
 
-### CPU/MPS Configuration (`configs/mps_small.yaml`) - Fallback
+**CPU/MPS (`configs/mps_small.yaml`)**
 ```yaml
-device:
-  prefer_mps: true
-  dtype: float16
-model:
-  max_length: 256
+device: { prefer_mps: true, dtype: float16 }
+model:  { max_length: 256 }
 training:
   batch_size: 1
   gradient_accumulation_steps: 16
 ```
 
-## NVIDIA NeMo Migration
+---
 
-For production deployments, consider switching to NVIDIA NeMo:
+## Evaluation & Expected Results
+- Test set: 200 samples / 4 classes
+- Metrics: accuracy, macro/weighted F1, per-class PRF, top-k, confusion matrix
+- Expected (synthetic): 85–95% accuracy, 0.85–0.95 macro-F1
+- Tests: `pytest -v` (18/20 passing; 2 minor test issues)
 
-### Benefits
-- Optimized CUDA Kernels: Custom implementations
-- Multi-GPU Training: Distributed training support
-- Model Parallelism: Large model support
-- Production Ready: Enterprise features
+---
 
-### Migration Path
-1. Replace PEFT with NeMo LoRA implementation
-2. Use NeMo's optimized tokenizer
-3. Leverage NeMo's distributed training
-4. Deploy with NeMo's serving framework
+## Triton (Optional)
 
-Expected improvements:
-- Training Speed: 2-3x faster
-- Memory Efficiency: 20-30% reduction
-- Scalability: Multi-GPU support
-- Production Features: Monitoring, logging
+Export model:
+```bash
+python scripts/export_for_triton.py --model-path outputs/<experiment>/final_model
+```
+
+Benefits: dynamic batching, model ensembling, high throughput, K8s autoscaling.
+
+---
+
+## Performance Notes
+- **CUDA**: Tensor Cores + AMP (bf16/fp16), gradient checkpointing, memory-efficient batching  
+- **MPS/CPU**: smaller batch sizes, gradient accumulation; shorter sequence length (256)
+
+---
+
+## Data Sources
+1) Synthetic tickets (~2k)  
+2) AG News (auto-downloaded and mapped to queues)
+
+---
+
+## Project Layout
+```
+ticket-routing-lora/
+├── configs/              # CUDA/MPS configs
+├── src/                  # data, preprocess, model, train, eval, infer, serve, utils
+├── scripts/              # synth data, quickstarts, export for Triton
+├── tests/                # unit tests
+├── data/                 # inputs
+└── reports/              # metrics & visuals
+```
+
+---
+
+## Why LoRA?
+- Trains <1% of weights → faster iteration, lower memory/compute, strong generalization for routing tasks.
+
+---
+
+## NVIDIA NeMo (Optional Migration)
+- Distributed/multi-GPU training, optimized kernels, production-grade serving/monitoring.
+
+---
 
 ## License
-
-MIT License
+MIT
 
 ## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
+1) Fork → branch → add tests → ensure all pass → PR
